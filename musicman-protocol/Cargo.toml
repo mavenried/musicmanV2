@@ -1,0 +1,9 @@
+[package]
+name = "musicman-protocol"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+bincode = "2.0.1"
+tokio-util = {version="0.7.16", features = ["codec"] }

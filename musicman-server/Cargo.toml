@@ -1,0 +1,8 @@
+[package]
+name = "musicman-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+musicman-protocol = { version = "0.1.0", path = "../musicman-protocol" }
+serde = "1.0.219"

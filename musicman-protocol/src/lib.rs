@@ -1,0 +1,41 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]
+enum Request {
+    Play { track_id: String }, // param uuid
+    Seek { position: u64 },
+    Playlist(PlaylistRequest),
+    Meta { track_id: String },
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]
+enum Response {
+    SongChunk {
+        track_id: String,
+        data: Vec<u8>,
+        index: u32,
+    },
+    EndOfStream,
+    Playlist(PlaylistResponse),
+    Meta {
+        track_id: String,
+        title: String,
+        duration: u64,
+        artist: Option<String>,
+    },
+    Error {
+        message: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]
+enum PlaylistRequest {
+    Get { playlist_id: String }, // param uuid
+    List,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]
+enum PlaylistResponse {
+    Playlists(Vec<String>),
+    Songs(Vec<String>),
+}
