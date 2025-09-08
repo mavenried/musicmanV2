@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]
-enum Request {
+pub enum Request {
     Play { track_id: String }, // param uuid
     Seek { position: u64 },
     Playlist(PlaylistRequest),
@@ -9,7 +9,7 @@ enum Request {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]
-enum Response {
+pub enum Response {
     SongChunk {
         track_id: String,
         data: Vec<u8>,
@@ -29,13 +29,13 @@ enum Response {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]
-enum PlaylistRequest {
+pub enum PlaylistRequest {
     Get { playlist_id: String }, // param uuid
     List,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]
-enum PlaylistResponse {
+pub enum PlaylistResponse {
     Playlists(Vec<String>),
     Songs(Vec<String>),
 }
