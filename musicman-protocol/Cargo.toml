@@ -7,3 +7,4 @@ edition = "2024"
 serde = { version = "1.0.219", features = ["derive"] }
 bincode = "2.0.1"
 tokio-util = {version="0.7.16", features = ["codec"] }
+uuid = { version = "1.4.1", features = ["v4", "serde"] }

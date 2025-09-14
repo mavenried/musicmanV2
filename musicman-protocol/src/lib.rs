@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]
 pub enum Request {
@@ -6,6 +7,14 @@ pub enum Request {
     Seek { position: u64 },
     Playlist(PlaylistRequest),
     Meta { track_id: String },
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]
+pub struct SongMeta {
+    pub id: Uuid,
+    pub title: String,
+    pub artist: String,
+    pub duration: u32, // in seconds
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Eq)]

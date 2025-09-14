@@ -1,17 +1,7 @@
-use bincode;
-use musicman_protocol::{Request, Response};
+use musicman_protocol::{PlaylistRequest, PlaylistResponse, Request, Response};
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener; // <- your shared crate
-
-use symphonia::core::codecs::DecoderOptions;
-use symphonia::core::formats::FormatOptions;
-use symphonia::core::io::MediaSourceStream;
-use symphonia::core::meta::MetadataOptions;
-use symphonia::default::get_probe;
-
-use std::fs::File;
-use std::sync::Arc;
+use std::{fs::File, sync::Arc};
+use tokio::net::TcpListener;
 
 mod utils;
 
@@ -46,14 +36,24 @@ async fn handle_client(socket: &mut tokio::net::TcpStream) -> anyhow::Result<()>
         // Deserialize request
         let request: Request = bincode::deserialize(&buf[..n])?;
 
+        tracing::info!("Requested: {:?}", request);
         match request {
             Request::Play { track_id } => {
-                tracing::info!("Client requested track {}", track_id);
+                let file = utils::get_track_file(track_id).await?;
+                stream_file(file, track_id, socket).await?;
             }
-
-            _ => {
-                tracing::warn!("Unsupported request: {:?}", request);
-            }
+            Request::Seek { position } => {}
+            Request::Playlist(plreq) => match plreq {
+                PlaylistRequest::List => {
+                    let playlists = get_all_playlists().await?;
+                    let plres = PlaylistResponse::Playlists(playlists);
+                }
+                PlaylistRequest::Get { playlist_id } => {
+                    let songs = utils::get_playlist(playlist_id).await?;
+                    let plres = PlaylistResponse::Songs(songs);
+                }
+            },
+            Request::Meta { track_id } => {}
         }
     }
 
