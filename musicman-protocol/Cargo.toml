@@ -1,10 +1,19 @@
 [package]
 name = "musicman-protocol"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
+authors = [
+  "mavenried <github.com/mavenried>",
+]
+license = "MIT OR Apache-2.0"
+description = "Make and manage aes encryped folders"
+
 
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"] }
 bincode = "2.0.1"
 tokio-util = {version="0.7.16", features = ["codec"] }
 uuid = { version = "1.4.1", features = ["v4", "serde"] }
+
+
+

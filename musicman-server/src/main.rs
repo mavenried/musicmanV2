@@ -1,6 +1,5 @@
 use musicman_protocol::{PlaylistRequest, PlaylistResponse, Request, Response};
-use serde::{Deserialize, Serialize};
-use std::{fs::File, sync::Arc};
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 
 mod utils;
@@ -13,18 +12,18 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Server listening on 0.0.0.0:4000");
 
     loop {
-        let (mut socket, addr) = listener.accept().await?;
+        let (socket, addr) = listener.accept().await?;
         tracing::info!("New client: {:?}", addr);
 
         tokio::spawn(async move {
-            if let Err(e) = handle_client(&mut socket).await {
+            if let Err(e) = handle_client(socket).await {
                 tracing::error!("Error with client {:?}: {:?}", addr, e);
             }
         });
     }
 }
 
-async fn handle_client(socket: &mut tokio::net::TcpStream) -> anyhow::Result<()> {
+async fn handle_client(mut socket: tokio::net::TcpStream) -> anyhow::Result<()> {
     let mut buf = vec![0u8; 4096];
 
     loop {
@@ -39,13 +38,20 @@ async fn handle_client(socket: &mut tokio::net::TcpStream) -> anyhow::Result<()>
         tracing::info!("Requested: {:?}", request);
         match request {
             Request::Play { track_id } => {
-                let file = utils::get_track_file(track_id).await?;
-                stream_file(file, track_id, socket).await?;
+                if let Ok(file) = utils::get_track_file(track_id.clone()).await {
+                    utils::stream_file(file, track_id, &mut socket).await?;
+                } else {
+                    let res = Response::Error {
+                        message: "Track not found".to_string(),
+                    };
+                    tracing::warn!("Track not found");
+                    utils::send_to_client(&mut socket, &res).await?;
+                }
             }
             Request::Seek { position } => {}
             Request::Playlist(plreq) => match plreq {
                 PlaylistRequest::List => {
-                    let playlists = get_all_playlists().await?;
+                    let playlists = utils::get_all_playlists().await?;
                     let plres = PlaylistResponse::Playlists(playlists);
                 }
                 PlaylistRequest::Get { playlist_id } => {
@@ -53,8 +59,18 @@ async fn handle_client(socket: &mut tokio::net::TcpStream) -> anyhow::Result<()>
                     let plres = PlaylistResponse::Songs(songs);
                 }
             },
-            Request::Meta { track_id } => {}
-        }
+            Request::Meta { track_id } => {
+                if let Some(meta) = utils::get_track_meta(&track_id).await? {
+                    let res = Response::Meta(meta);
+                    utils::send_to_client(&mut socket, &res).await?;
+                } else {
+                    let res = Response::Error {
+                        message: "Track not found".to_string(),
+                    };
+                    utils::send_to_client(&mut socket, &res).await?;
+                }
+            }
+        };
     }
 
     Ok(())

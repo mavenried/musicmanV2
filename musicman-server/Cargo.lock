@@ -302,7 +302,9 @@ dependencies = [
 
 [[package]]
 name = "musicman-protocol"
-version = "0.1.0"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0484ed492eaaf6ca914647cbef3ecc49bd6888fad60bb90c66de0973a6dd60d"
 dependencies = [
  "bincode 2.0.1",
  "serde",

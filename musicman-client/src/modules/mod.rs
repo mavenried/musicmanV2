@@ -6,21 +6,27 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time;
 
-type Stream = Arc<Mutex<TcpStream>>;
+type RodioSink = Arc<rodio::Sink>;
+
+mod player;
+use player::*;
 
 pub struct State {
     pub songid: String,
     pub queue: Vec<String>,
 }
 
-fn send_to_server(stream: &Stream, req: Request) {
-    let mut stream = stream.lock().unwrap();
+fn send_to_server(mut stream: &TcpStream, req: Request) {
     let req_bytes = bincode::serialize(&req).unwrap();
     let req_bytes = req_bytes.as_slice();
     stream.write_all(req_bytes).unwrap();
 }
 
-pub fn user_input(stream: Stream, state: Arc<Mutex<State>>) -> thread::JoinHandle<()> {
+pub fn user_input(
+    stream: TcpStream,
+    state: Arc<Mutex<State>>,
+    sink: RodioSink,
+) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         loop {
             thread::sleep(time::Duration::from_millis(10));
@@ -70,6 +76,11 @@ pub fn user_input(stream: Stream, state: Arc<Mutex<State>>) -> thread::JoinHandl
                 }
                 "play" | "pause" | "p" => {
                     println!("{}", "Toggling play/pause...".green());
+                    if sink.is_paused() {
+                        sink.play()
+                    } else {
+                        sink.pause()
+                    };
                 }
                 "clear" => {
                     println!("{}", "Clearing queue...".green());
@@ -80,8 +91,10 @@ pub fn user_input(stream: Stream, state: Arc<Mutex<State>>) -> thread::JoinHandl
                         if let Ok(n) = input[1].parse::<usize>() {
                             if input[0] == "next" {
                                 println!("{}", format!("Skipping {} song(s)...", n).green());
+                                get_next_song(&state, n);
                             } else {
                                 println!("{}", format!("Going back {} song(s)...", n).green());
+                                get_prev_song(&state, n);
                             }
                         } else if input[0] == "next" {
                             println!("{}", "Usage: next <+ve number>".yellow().italic());
@@ -90,8 +103,10 @@ pub fn user_input(stream: Stream, state: Arc<Mutex<State>>) -> thread::JoinHandl
                         }
                     } else if input[0] == "next" {
                         println!("{}", "Skipping 1 song...".green());
+                        get_next_song(&state, 1);
                     } else {
                         println!("{}", "Going back 1 song...".green());
+                        get_prev_song(&state, 1);
                     }
                 }
                 "exit" => {

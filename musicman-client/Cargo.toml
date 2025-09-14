@@ -23,6 +23,6 @@ rodio = "0.17"
 anyhow = "1"
 
 # Your shared protocol crate
-musicman-protocol = { path = "../musicman-protocol" }
+musicman-protocol = {path = "../musicman-protocol"}
 rustyline = "17.0.1"
 

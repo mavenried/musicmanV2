@@ -26,12 +26,7 @@ pub enum Response {
     },
     EndOfStream,
     Playlist(PlaylistResponse),
-    Meta {
-        track_id: String,
-        title: String,
-        duration: u64,
-        artist: Option<String>,
-    },
+    Meta(SongMeta),
     Error {
         message: String,
     },
