@@ -155,17 +155,13 @@ pub async fn save_index(index: &SongIndex) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn get_track_file(track_id: &Uuid) -> anyhow::Result<File> {
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))
-        .unwrap()
-        .join("musicman")
-        .join("tracks")
-        .join(format!("{}.mp3", track_id));
-
-    let file = OpenOptions::new().read(true).open(config_dir).await?;
-
-    Ok(file)
+pub async fn get_track_file(track_id: &Uuid, index: &SongIndex) -> anyhow::Result<File> {
+    if let Some(meta) = get_track_meta(track_id, index).await? {
+        let track_path = meta.path;
+        let file = OpenOptions::new().read(true).open(track_path).await?;
+        return Ok(file);
+    }
+    Err(anyhow::anyhow!("File Not Found!"))
 }
 
 pub async fn get_playlist(playlist_id: &Uuid) -> anyhow::Result<Vec<Uuid>> {

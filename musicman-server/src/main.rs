@@ -42,17 +42,16 @@ async fn handle_client(mut socket: tokio::net::TcpStream) -> anyhow::Result<()> 
 
         tracing::info!("Requested: {:?}", request);
         match request {
-            Request::Play { track_id } => {
-                if let Ok(file) = helpers::get_track_file(&track_id).await {
-                    handlers::stream_file(file, &track_id, &mut socket).await?;
-                } else {
+            Request::Play { track_id } => match helpers::get_track_file(&track_id, &index).await {
+                Ok(file) => handlers::stream_file(file, &track_id, &mut socket).await?,
+                Err(e) => {
                     let res = Response::Error {
                         message: "Track not found".to_string(),
                     };
-                    tracing::warn!("Track not found");
+                    tracing::warn!("{e}");
                     helpers::send_to_client(&mut socket, &res).await?;
                 }
-            }
+            },
             Request::Search(s_type) => {
                 let data = handlers::handle_search(s_type, &index).await;
                 let res = Response::Playlist(PlaylistResponse::Songs(data));
