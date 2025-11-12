@@ -5,6 +5,7 @@ use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time;
+use uuid::Uuid;
 
 type RodioSink = Arc<rodio::Sink>;
 
@@ -12,8 +13,8 @@ mod player;
 use player::*;
 
 pub struct State {
-    pub songid: String,
-    pub queue: Vec<String>,
+    pub songid: Option<Uuid>,
+    pub queue: Vec<Uuid>,
 }
 
 fn send_to_server(mut stream: &TcpStream, req: Request) {
@@ -47,14 +48,9 @@ pub fn user_input(
             match input[0].as_str() {
                 "add" => {
                     if input.len() > 1 {
-                        let songid = input[1..].join(" ");
-                        send_to_server(
-                            &stream,
-                            Request::Play {
-                                track_id: songid.clone(),
-                            },
-                        );
-                        state.lock().unwrap().songid = songid;
+                        let songid = Uuid::parse_str(&input[1]).unwrap();
+                        send_to_server(&stream, Request::Play { track_id: songid });
+                        state.lock().unwrap().songid = Some(songid);
                     } else {
                         println!("{}", "add: Insufficient arguments".red());
                         println!("{}", "add <song name>".yellow().italic());
@@ -62,14 +58,14 @@ pub fn user_input(
                 }
                 "replay" => {
                     println!("{}", "Replaying current song...".green());
-                    let songid = state.lock().unwrap().songid.clone();
-                    if songid.is_empty() {
+                    let songid = state.lock().unwrap().songid;
+                    if songid.is_none() {
                         println!("{}", "No song to replay".red());
                     } else {
                         send_to_server(
                             &stream,
                             Request::Play {
-                                track_id: songid.clone(),
+                                track_id: songid.unwrap().clone(),
                             },
                         );
                     }

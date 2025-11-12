@@ -1,24 +1,14 @@
 use crate::helpers::*;
 use musicman_protocol::*;
-use std::{collections::HashMap, path::PathBuf};
-use symphonia::{
-    core::{
-        audio::SampleBuffer,
-        codecs::{CODEC_TYPE_NULL, DecoderOptions},
-        formats::FormatOptions,
-        io::MediaSourceStream,
-        meta::MetadataOptions,
-        units::TimeStamp,
-    },
-    default::get_probe,
+use symphonia::core::{
+    audio::SampleBuffer,
+    codecs::{CODEC_TYPE_NULL, DecoderOptions},
+    formats::FormatOptions,
+    io::MediaSourceStream,
+    meta::MetadataOptions,
 };
-use tokio::{
-    fs::{File, OpenOptions},
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
+use tokio::net::TcpStream;
 use uuid::Uuid;
-use walkdir::WalkDir;
 
 pub async fn stream_file(
     file: tokio::fs::File,

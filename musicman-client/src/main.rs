@@ -1,37 +1,16 @@
 use colored::Colorize;
-use musicman_protocol::{PlaylistRequest, Request, Response};
+use musicman_protocol::*;
 use rodio::{OutputStream, Sink};
-use std::io::{BufRead, Read, Write, stdin, stdout};
-use std::net::{TcpListener, TcpStream};
+use std::io::Read;
+use std::net::TcpStream;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time;
 
 mod modules;
 use modules::*;
 
 type Stream = TcpStream;
-
-struct ChannelReader {
-    rx: mpsc::Receiver<Vec<u8>>,
-    buffer: Vec<u8>,
-}
-
-impl Read for ChannelReader {
-    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
-        if self.buffer.is_empty() {
-            match self.rx.recv() {
-                Ok(chunk) => self.buffer = chunk,
-                Err(_) => return Ok(0), // channel closed => EOF
-            }
-        }
-        let n = out.len().min(self.buffer.len());
-        out[..n].copy_from_slice(&self.buffer[..n]);
-        self.buffer.drain(..n);
-        Ok(n)
-    }
-}
 
 fn server_interface(mut stream: Stream) {
     thread::spawn(move || {
@@ -82,7 +61,7 @@ fn main() {
     let sink = Arc::new(Sink::try_new(&stream_handle).unwrap());
     let stream = TcpStream::connect(&addr).unwrap();
     let state = Arc::new(Mutex::new(State {
-        songid: String::new(),
+        songid: None,
         queue: Vec::new(),
     }));
 

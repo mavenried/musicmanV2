@@ -1,55 +1,72 @@
 use crate::State;
 use colored::Colorize;
-use std::io::Read;
-use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use musicman_protocol::*;
+use rodio::{OutputStream, Sink};
+use std::{
+    sync::{Arc, Mutex, mpsc},
+    thread,
+};
 
-struct ChannelReader {
-    rx: mpsc::Receiver<Vec<u8>>,
-    buffer: Vec<u8>,
-}
+pub fn player(prx: mpsc::Receiver<Response>, sink: Arc<Sink>) {
+    thread::spawn(move || {
+        let mut samples: Vec<i16> = Vec::new();
 
-impl Read for ChannelReader {
-    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
-        if self.buffer.is_empty() {
-            match self.rx.recv() {
-                Ok(chunk) => self.buffer = chunk,
-                Err(_) => return Ok(0), // channel closed => EOF
+        // Collect all audio chunks first
+        while let Ok(msg) = prx.recv() {
+            match msg {
+                Response::SongChunk { data, .. } => {
+                    samples.extend_from_slice(&data);
+                }
+                Response::EndOfStream => {
+                    break;
+                }
+                Response::Error { message } => {
+                    eprintln!("Server error: {}", message);
+                    return;
+                }
+                _ => {}
             }
         }
-        let n = out.len().min(self.buffer.len());
-        out[..n].copy_from_slice(&self.buffer[..n]);
-        self.buffer.drain(..n);
-        Ok(n)
-    }
-}
 
-pub fn player(sink: Arc<rodio::Sink>, prx: mpsc::Receiver<Vec<u8>>) {
-    std::thread::spawn(|| {
-        let mut reader = ChannelReader {
-            rx: prx,
-            buffer: Vec::new(),
+        if samples.is_empty() {
+            eprintln!("No audio data received.");
+            return;
+        }
+
+        // Playback once fully buffered
+        let (_stream, stream_handle) = match OutputStream::try_default() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Audio output error: {}", e);
+                return;
+            }
         };
-        let source = rodio::Decoder::new(reader).unwrap();
+
+        // convert Vec<i16> -> rodio Source
+        let source = rodio::buffer::SamplesBuffer::new(2, 44100, samples);
         sink.append(source);
         sink.sleep_until_end();
     });
 }
+
 pub fn get_next_song(state: &Arc<Mutex<State>>, n: usize) {
     let mut state = state.lock().unwrap();
     if state.queue.is_empty() {
         println!("{}", "Queue is empty!".red());
         return;
     }
-    if state.songid.is_empty() {
-        state.songid = state.queue[0].clone();
-        println!("{}", format!("Now playing: {}", state.songid).green());
+    if state.songid.is_none() {
+        state.songid = Some(state.queue[0].clone());
+        println!(
+            "{}",
+            format!("Now playing: {}", state.songid.unwrap()).green()
+        );
         return;
     }
     let current_index = state
         .queue
         .iter()
-        .position(|x| *x == state.songid)
+        .position(|x| *x == state.songid.unwrap())
         .unwrap_or(0);
     if current_index >= state.queue.len() - 1 {
         println!("{}", "Already at the end of the queue!".red());
@@ -60,8 +77,11 @@ pub fn get_next_song(state: &Arc<Mutex<State>>, n: usize) {
     } else {
         state.queue.len() - 1
     };
-    state.songid = state.queue[new_index].clone();
-    println!("{}", format!("Now playing: {}", state.songid).green());
+    state.songid = Some(state.queue[new_index].clone());
+    println!(
+        "{}",
+        format!("Now playing: {}", state.songid.unwrap()).green()
+    );
 }
 
 pub fn get_prev_song(state: &Arc<Mutex<State>>, n: usize) {
@@ -70,15 +90,18 @@ pub fn get_prev_song(state: &Arc<Mutex<State>>, n: usize) {
         println!("{}", "Queue is empty!".red());
         return;
     }
-    if state.songid.is_empty() {
-        state.songid = state.queue[0].clone();
-        println!("{}", format!("Now playing: {}", state.songid).green());
+    if state.songid.is_none() {
+        state.songid = Some(state.queue[0].clone());
+        println!(
+            "{}",
+            format!("Now playing: {}", state.songid.unwrap()).green()
+        );
         return;
     }
     let current_index = state
         .queue
         .iter()
-        .position(|x| *x == state.songid)
+        .position(|x| *x == state.songid.unwrap())
         .unwrap_or(0);
     if current_index == 0 {
         println!("{}", "Already at the beginning of the queue!".red());
@@ -89,6 +112,9 @@ pub fn get_prev_song(state: &Arc<Mutex<State>>, n: usize) {
     } else {
         0
     };
-    state.songid = state.queue[new_index].clone();
-    println!("{}", format!("Now playing: {}", state.songid).green());
+    state.songid = Some(state.queue[new_index].clone());
+    println!(
+        "{}",
+        format!("Now playing: {}", state.songid.unwrap()).green()
+    );
 }
