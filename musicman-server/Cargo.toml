@@ -1,6 +1,6 @@
 
 [package]
-name = "music-server"
+name = "musicman-server"
 version = "0.1.0"
 edition = "2024"
 
@@ -20,4 +20,6 @@ anyhow = "1.0.99"
 musicman-protocol = { path = "../musicman-protocol" }
 dirs = "6.0.0"
 serde_json = "1.0.144"
-uuid = {version= "1.18.1", features = ["v4", "serde"]}
+uuid = {version= "1.18.1", features = ["v5", "serde"]}
+walkdir = "2.5.0"
+sha1 = "0.10.6"
