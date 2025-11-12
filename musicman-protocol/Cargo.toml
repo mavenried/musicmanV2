@@ -6,7 +6,7 @@ authors = [
   "mavenried <github.com/mavenried>",
 ]
 license = "MIT OR Apache-2.0"
-description = "Make and manage aes encryped folders"
+description = "Protocol for musicmanV2"
 
 
 [dependencies]
