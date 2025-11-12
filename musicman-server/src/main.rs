@@ -3,7 +3,6 @@ use tokio::{io::AsyncReadExt, net::TcpListener};
 
 mod handlers;
 mod helpers;
-mod utils;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -57,7 +56,6 @@ async fn handle_client(mut socket: tokio::net::TcpStream) -> anyhow::Result<()> 
                 let res = Response::Playlist(PlaylistResponse::Songs(data));
                 helpers::send_to_client(&mut socket, &res).await?;
             }
-            Request::Seek { position } => {}
             Request::Playlist(plreq) => match plreq {
                 PlaylistRequest::List => {
                     let playlists = helpers::get_all_playlists().await?;
