@@ -29,11 +29,14 @@ fn main() {
         queue: Vec::new(),
     }));
 
+    let (stx, srx) = mpsc::channel::<UiResponse>();
+    let (utx, urx) = mpsc::channel::<UiRequest>();
     let (ptx, prx) = mpsc::channel::<Response>();
 
-    threads::server_interface(stream.try_clone().unwrap(), ptx);
+    threads::server_interface(stream.try_clone().unwrap(), ptx, utx, srx);
+
     threads::player(prx, sink.clone());
-    threads::user_input(stream, state.clone(), sink.clone())
+    threads::user_input(stream, state.clone(), sink.clone(), urx, stx)
         .join()
         .unwrap();
 }

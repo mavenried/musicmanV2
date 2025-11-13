@@ -1,9 +1,12 @@
-use crate::{helpers, player, types::*};
+use crate::{
+    helpers::{self, send_to_server},
+    player,
+    types::*,
+};
 use colored::Colorize;
 use musicman_protocol::*;
-use rodio::{OutputStream, Sink};
 use std::{
-    io::{Read, Write, stdin, stdout},
+    io::{Write, stdin, stdout},
     net::TcpStream,
     sync::{
         Arc, Mutex,
@@ -13,16 +16,36 @@ use std::{
 };
 use uuid::Uuid;
 
-type Stream = TcpStream;
-
 pub fn user_input(
     stream: TcpStream,
     state: Arc<Mutex<State>>,
     sink: RodioSink,
+    urx: Receiver<UiRequest>,
+    stx: Sender<UiResponse>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         loop {
-            thread::sleep(time::Duration::from_millis(10));
+            thread::sleep(time::Duration::from_millis(100));
+            if let Ok(req) = urx.try_recv() {
+                match req {
+                    UiRequest::Display(s) => println!("{}", s.yellow()),
+                    UiRequest::Prompt { s, prompt } => {
+                        println!("{}", s.blue());
+                        print!("{}", (prompt + "❯ ").yellow().bold());
+                        stdout().flush().unwrap();
+                        let mut input = String::new();
+                        stdin().read_line(&mut input).unwrap();
+                        input = input.trim().to_string();
+                        stx.send(UiResponse(input)).unwrap();
+                    }
+                    UiRequest::GetMeta(songs) => {
+                        for song in songs {
+                            send_to_server(&stream, Request::Meta { track_id: song });
+                        }
+                    }
+                }
+                continue;
+            }
             print!("{}", "musicman❯ ".green().bold());
             stdout().flush().unwrap();
             let mut input = String::new();
@@ -145,6 +168,29 @@ pub fn user_input(
                         println!("{}", "add <song name>".yellow().italic());
                     }
                 }
+                "search" => {
+                    if input.len() > 1 {
+                        match input[1].as_str() {
+                            "artist" | "a" => {
+                                let artist = input[2..].join(" ").to_lowercase();
+                                helpers::send_to_server(
+                                    &stream,
+                                    Request::Search(SearchType::ByArtist(artist)),
+                                );
+                            }
+                            "ls" | "show" => {}
+                            cmd => {
+                                println!(
+                                    "{} {} {}",
+                                    "playlist: ".red(),
+                                    cmd.red().bold(),
+                                    " is not a valid command".red()
+                                );
+                                println!("{}", "Usage: playlist <add|new|show>".yellow());
+                            }
+                        }
+                    }
+                }
                 cmd => {
                     println!("{} {}", "Unknown command".red(), cmd.red().bold());
                     println!(
@@ -157,93 +203,4 @@ pub fn user_input(
             }
         }
     })
-}
-
-pub fn server_interface(mut stream: Stream, ptx: Sender<Response>) {
-    thread::spawn(move || {
-        let mut reader = std::io::BufReader::new(&mut stream);
-        let mut buffer = vec![0; 4096];
-
-        loop {
-            let n = reader.read(&mut buffer);
-
-            match n {
-                Ok(0) => {
-                    // Connection closed
-                    println!("{}", "Error: Connection closed by server".red());
-                    break;
-                }
-                Ok(_) => {
-                    if let Ok(response) = bincode::deserialize::<Response>(&buffer) {
-                        match response {
-                            Response::Meta(songmeta) => {
-                                let mins = songmeta.duration / 60;
-                                let secs = songmeta.duration % 60;
-                                println!("Title: {}", songmeta.title);
-                                println!("Artist(s): {}", songmeta.artists.join(", "));
-                                println!("Duration: {}m {}s", mins, secs);
-                            }
-                            Response::SongChunk { .. }
-                            | Response::SongHeader { .. }
-                            | Response::EndOfStream { .. } => {
-                                ptx.send(response).unwrap();
-                            }
-
-                            _ => {
-                                println!("Received response: {:?}", response);
-                            }
-                        }
-                    } else {
-                        println!("{}", "Error: Failed to deserialize response".red());
-                    }
-                }
-                Err(e) => {
-                    println!("Error reading from server: {}", e);
-                    break;
-                }
-            }
-        }
-    });
-}
-
-pub fn player(prx: Receiver<Response>, sink: Arc<Sink>) {
-    thread::spawn(move || {
-        let mut samples: Vec<i16> = Vec::new();
-
-        // Collect all audio chunks first
-        while let Ok(msg) = prx.recv() {
-            match msg {
-                Response::SongChunk { data, .. } => {
-                    samples.extend_from_slice(&data);
-                }
-                Response::EndOfStream { track_id: _ } => {
-                    break;
-                }
-                Response::Error { message } => {
-                    eprintln!("Server error: {}", message);
-                    return;
-                }
-                _ => {}
-            }
-        }
-
-        if samples.is_empty() {
-            eprintln!("No audio data received.");
-            return;
-        }
-
-        // Playback once fully buffered
-        let (_stream, stream_handle) = match OutputStream::try_default() {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Audio output error: {}", e);
-                return;
-            }
-        };
-
-        // convert Vec<i16> -> rodio Source
-        let source = rodio::buffer::SamplesBuffer::new(2, 44100, samples);
-        sink.append(source);
-        sink.sleep_until_end();
-    });
 }

@@ -6,3 +6,11 @@ pub struct State {
     pub queue: Vec<Uuid>,
 }
 pub type RodioSink = Arc<rodio::Sink>;
+
+pub enum UiRequest {
+    Prompt { s: String, prompt: String },
+    Display(String),
+    GetMeta(Vec<Uuid>),
+}
+
+pub struct UiResponse(pub String);
