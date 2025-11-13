@@ -17,7 +17,7 @@ pub fn player(prx: mpsc::Receiver<Response>, sink: Arc<Sink>) {
                 Response::SongChunk { data, .. } => {
                     samples.extend_from_slice(&data);
                 }
-                Response::EndOfStream => {
+                Response::EndOfStream { track_id: _ } => {
                     break;
                 }
                 Response::Error { message } => {
