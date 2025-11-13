@@ -13,11 +13,11 @@ pub fn send_to_server(mut stream: &TcpStream, req: Request) {
 }
 pub fn read_from_client(stream: &mut TcpStream) -> Result<Response> {
     let mut len_buf = [0u8; 4];
-    stream.read(&mut len_buf)?;
+    stream.read_exact(&mut len_buf)?;
     let msg_len = u32::from_be_bytes(len_buf) as usize;
 
     let mut buf = vec![0u8; msg_len];
-    stream.read(&mut buf)?;
+    stream.read_exact(&mut buf)?;
     let res: Response = bincode::deserialize(&buf)?;
     Ok(res)
 }
