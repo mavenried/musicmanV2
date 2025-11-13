@@ -26,18 +26,26 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
+async fn read_request(socket: &mut tokio::net::TcpStream) -> anyhow::Result<Request> {
+    let mut len_buf = [0u8; 4];
+    socket.read_exact(&mut len_buf).await?;
+    let msg_len = u32::from_be_bytes(len_buf) as usize;
+
+    let mut buf = vec![0u8; msg_len];
+    socket.read_exact(&mut buf).await?;
+    let req: Request = bincode::deserialize(&buf)?;
+    Ok(req)
+}
 async fn handle_client(mut socket: tokio::net::TcpStream) -> anyhow::Result<()> {
-    let mut buf = vec![0u8; 4096];
     let index = helpers::load_index().await?;
 
     loop {
-        let n = socket.read(&mut buf).await?;
-        if n == 0 {
-            break; // client closed
-        }
-
         // Deserialize request
-        let request: Request = bincode::deserialize(&buf[..n])?;
+        let maybe_request = read_request(&mut socket).await;
+        if maybe_request.is_err() {
+            break;
+        }
+        let request = maybe_request.unwrap();
 
         tracing::info!("Requested: {:?}", request);
         match request {

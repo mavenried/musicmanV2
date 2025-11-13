@@ -1,11 +1,14 @@
 use crate::helpers::*;
 use musicman_protocol::*;
-use symphonia::core::{
-    audio::SampleBuffer,
-    codecs::{CODEC_TYPE_NULL, DecoderOptions},
-    formats::FormatOptions,
-    io::MediaSourceStream,
-    meta::MetadataOptions,
+use symphonia::{
+    core::{
+        audio::SampleBuffer,
+        codecs::{CODEC_TYPE_NULL, DecoderOptions},
+        formats::FormatOptions,
+        io::MediaSourceStream,
+        meta::MetadataOptions,
+    },
+    default::get_probe,
 };
 use tokio::net::TcpStream;
 use uuid::Uuid;
@@ -16,9 +19,9 @@ pub async fn stream_file(
     stream: &mut TcpStream,
 ) -> anyhow::Result<()> {
     let std_file = file.into_std().await;
-    let mss = MediaSourceStream::new(Box::new(std_file), Default::default());
+    let mss = symphonia::core::io::MediaSourceStream::new(Box::new(std_file), Default::default());
 
-    let probed = symphonia::default::get_probe().format(
+    let probed = get_probe().format(
         &Default::default(),
         mss,
         &FormatOptions::default(),
@@ -29,11 +32,26 @@ pub async fn stream_file(
     let track = format
         .tracks()
         .iter()
-        .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
+        .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
         .ok_or_else(|| anyhow::anyhow!("No supported audio tracks"))?;
 
     let dec_opts = DecoderOptions { verify: true };
     let mut decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts)?;
+
+    // Send a header first
+    let sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
+    let channels = track
+        .codec_params
+        .channels
+        .map(|c| c.count() as u16)
+        .unwrap_or(1);
+
+    let header = Response::SongHeader {
+        track_id: track_id.clone(),
+        channels,
+        sample_rate,
+    };
+    send_to_client(stream, &header).await?;
 
     let mut index: u32 = 0;
 
@@ -50,16 +68,14 @@ pub async fn stream_file(
             Err(e) => return Err(e.into()),
         };
 
-        let spec = *decoded.spec();
         let duration = decoded.capacity() as u64;
-        let mut sample_buf = SampleBuffer::<i16>::new(duration, spec);
+        let mut sample_buf = SampleBuffer::<i16>::new(duration, *decoded.spec());
         sample_buf.copy_interleaved_ref(decoded);
 
         let samples = sample_buf.samples();
 
-        for chunk in samples.chunks(2048) {
+        for chunk in samples.chunks(2000) {
             let data: Vec<i16> = chunk.to_vec();
-
             let res = Response::SongChunk {
                 track_id: track_id.clone(),
                 data,
@@ -71,11 +87,14 @@ pub async fn stream_file(
         }
     }
 
-    let res = Response::EndOfStream;
+    let res = Response::EndOfStream {
+        track_id: track_id.clone(),
+    };
     send_to_client(stream, &res).await?;
 
     Ok(())
 }
+
 pub async fn handle_search(s: SearchType, index: &SongIndex) -> Vec<Uuid> {
     let mut results = Vec::new();
 

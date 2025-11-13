@@ -19,6 +19,8 @@ pub async fn send_to_client(
     response: &Response,
 ) -> anyhow::Result<()> {
     let encoded: Vec<u8> = bincode::serialize(response)?;
+    let len = (encoded.len() as u32).to_be_bytes();
+    socket.write_all(&len).await?;
     socket.write_all(&encoded).await?;
     Ok(())
 }
