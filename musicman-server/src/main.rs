@@ -1,8 +1,17 @@
+use std::sync::Arc;
+
 use musicman_protocol::{PlaylistRequest, PlaylistResponse, Request, Response};
-use tokio::{io::AsyncReadExt, net::TcpListener};
+use tokio::{
+    io::AsyncReadExt,
+    net::{TcpListener, tcp::OwnedReadHalf},
+    sync::{Mutex, mpsc},
+};
 
 mod handlers;
 mod helpers;
+mod types;
+use tracing::info;
+use types::State;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -26,22 +35,29 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-async fn read_request(socket: &mut tokio::net::TcpStream) -> anyhow::Result<Request> {
+async fn read_request(read: &mut OwnedReadHalf) -> anyhow::Result<Request> {
     let mut len_buf = [0u8; 4];
-    socket.read_exact(&mut len_buf).await?;
+    read.read_exact(&mut len_buf).await?;
     let msg_len = u32::from_be_bytes(len_buf) as usize;
 
     let mut buf = vec![0u8; msg_len];
-    socket.read_exact(&mut buf).await?;
+    read.read_exact(&mut buf).await?;
     let req: Request = bincode::deserialize(&buf)?;
     Ok(req)
 }
-async fn handle_client(mut socket: tokio::net::TcpStream) -> anyhow::Result<()> {
+
+async fn handle_client(socket: tokio::net::TcpStream) -> anyhow::Result<()> {
+    let (mut read, write) = socket.into_split();
+    let write = Arc::new(Mutex::new(write));
+
     let index = helpers::load_index().await?;
+    let mut state = State {
+        current_stream_cancel: None,
+    };
 
     loop {
         // Deserialize request
-        let maybe_request = read_request(&mut socket).await;
+        let maybe_request = read_request(&mut read).await;
         if maybe_request.is_err() {
             break;
         }
@@ -49,48 +65,72 @@ async fn handle_client(mut socket: tokio::net::TcpStream) -> anyhow::Result<()> 
 
         tracing::info!("Requested: {:?}", request);
         match request {
-            Request::Play { track_id } => match helpers::get_track_file(&track_id, &index).await {
-                Ok(file) => handlers::stream_file(file, &track_id, &mut socket).await?,
-                Err(e) => {
-                    let res = Response::Error {
-                        message: "Track not found".to_string(),
-                    };
-                    tracing::warn!("{e}");
-                    helpers::send_to_client(&mut socket, &res).await?;
+            Request::Play { track_id } => {
+                if let Some(_) = &state.current_stream_cancel {
+                    info!("Cancelling Stream");
+                    state.current_stream_cancel = None;
                 }
-            },
+                match helpers::get_track_file(&track_id, &index).await {
+                    Ok(file) => {
+                        let (cancel_tx, cancel_rx) = mpsc::channel::<()>(4);
+                        let write_copy = write.clone();
+                        tokio::spawn(async move {
+                            tracing::info!("Started streaming.");
+                            if let Err(e) = handlers::stream_file(
+                                file,
+                                track_id.clone(),
+                                &write_copy,
+                                cancel_rx,
+                            )
+                            .await
+                            {
+                                tracing::error!("Streaming file failed. {e}")
+                            }
+                        });
+                        state.current_stream_cancel = Some(cancel_tx);
+                    }
+                    Err(e) => {
+                        let res = Response::Error {
+                            message: "Track not found".to_string(),
+                        };
+                        tracing::warn!("{e}");
+                        helpers::send_to_client(&write, &res).await?;
+                    }
+                };
+            }
             Request::Search(s_type) => {
                 let data = handlers::handle_search(s_type, &index).await;
                 let res = Response::Playlist(PlaylistResponse::Songs(data));
-                helpers::send_to_client(&mut socket, &res).await?;
+                helpers::send_to_client(&write, &res).await?;
             }
             Request::Playlist(plreq) => match plreq {
                 PlaylistRequest::List => {
                     let playlists = helpers::get_all_playlists().await?;
                     let plres = PlaylistResponse::Playlists(playlists);
                     let res = Response::Playlist(plres);
-                    helpers::send_to_client(&mut socket, &res).await?;
+                    helpers::send_to_client(&write, &res).await?;
                 }
                 PlaylistRequest::Get { playlist_id } => {
-                    let songs = helpers::get_playlist(&playlist_id).await?;
+                    let songs = helpers::get_playlist(&playlist_id, &index).await?;
                     let plres = PlaylistResponse::Songs(songs);
                     let res = Response::Playlist(plres);
-                    helpers::send_to_client(&mut socket, &res).await?;
+                    helpers::send_to_client(&write, &res).await?;
                 }
             },
             Request::Meta { track_id } => {
                 if let Some(meta) = helpers::get_track_meta(&track_id, &index).await? {
                     let res = Response::Meta(meta);
-                    helpers::send_to_client(&mut socket, &res).await?;
+                    helpers::send_to_client(&write, &res).await?;
                 } else {
                     let res = Response::Error {
                         message: "Track not found".to_string(),
                     };
-                    helpers::send_to_client(&mut socket, &res).await?;
+                    helpers::send_to_client(&write, &res).await?;
                 }
             }
         };
     }
 
+    info!("Client Disconnected.");
     Ok(())
 }

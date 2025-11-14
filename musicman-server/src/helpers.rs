@@ -1,3 +1,4 @@
+use crate::types::*;
 use musicman_protocol::*;
 use std::{collections::HashMap, path::PathBuf};
 use symphonia::{
@@ -13,15 +14,12 @@ use tokio::{
 use uuid::Uuid;
 use walkdir::WalkDir;
 
-pub type SongIndex = HashMap<Uuid, SongMeta>;
-pub async fn send_to_client(
-    socket: &mut tokio::net::TcpStream,
-    response: &Response,
-) -> anyhow::Result<()> {
+pub async fn send_to_client(socket: &WriteSocket, response: &Response) -> anyhow::Result<()> {
     let encoded: Vec<u8> = bincode::serialize(response)?;
     let len = (encoded.len() as u32).to_be_bytes();
-    socket.write_all(&len).await?;
-    socket.write_all(&encoded).await?;
+    let mut socket_locked = socket.lock().await;
+    socket_locked.write_all(&len).await?;
+    socket_locked.write_all(&encoded).await?;
     Ok(())
 }
 
@@ -111,7 +109,6 @@ pub async fn generate_index(music_dir: &PathBuf) -> anyhow::Result<()> {
         }
 
         let id = uuid::Uuid::new_v5(&Uuid::NAMESPACE_URL, path.display().to_string().as_bytes());
-        tracing::warn!("{}", id.to_string());
         let artists = artist
             .split('/')
             .map(|s| s.to_string())
@@ -125,11 +122,7 @@ pub async fn generate_index(music_dir: &PathBuf) -> anyhow::Result<()> {
             path,
         };
 
-        let log = format!("{songmeta:?}");
-
         index.insert(id, songmeta);
-
-        tracing::info!(log);
     }
 
     tracing::info!("Indexed {} songs.", index.len());
@@ -166,7 +159,7 @@ pub async fn get_track_file(track_id: &Uuid, index: &SongIndex) -> anyhow::Resul
     Err(anyhow::anyhow!("File Not Found!"))
 }
 
-pub async fn get_playlist(playlist_id: &Uuid) -> anyhow::Result<Vec<Uuid>> {
+pub async fn get_playlist(playlist_id: &Uuid, index: &SongIndex) -> anyhow::Result<Vec<SongMeta>> {
     let config_dir = dirs::config_dir()
         .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
         .join("musicman")
@@ -174,7 +167,13 @@ pub async fn get_playlist(playlist_id: &Uuid) -> anyhow::Result<Vec<Uuid>> {
         .join(format!("{}.json", playlist_id));
 
     let data = tokio::fs::read_to_string(config_dir).await?;
-    let songs: Vec<Uuid> = serde_json::from_str(&data)?;
+    let song_uuids: Vec<Uuid> = serde_json::from_str(&data)?;
+    let mut songs = vec![];
+    for id in song_uuids {
+        if let Some(meta) = get_track_meta(&id, index).await? {
+            songs.push(meta);
+        }
+    }
     Ok(songs)
 }
 
