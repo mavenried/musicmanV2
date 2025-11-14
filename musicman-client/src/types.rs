@@ -1,16 +1,68 @@
-use std::sync::Arc;
+use musicman_protocol::SongMeta;
+use std::{
+    fmt,
+    sync::{Arc, Mutex},
+};
+use tabled::Tabled;
 use uuid::Uuid;
 
-pub struct State {
-    pub songid: Option<Uuid>,
-    pub queue: Vec<Uuid>,
+pub struct ClientStateStruct {
+    pub current_song: Option<SongMeta>,
+    pub queue: Vec<SongMeta>,
+    pub current_idx: usize,
 }
-pub type RodioSink = Arc<rodio::Sink>;
+pub struct PlayerStateStruct {
+    pub channels: u16,
+    pub sample_rate: u32,
+    pub current_id: Option<Uuid>,
+    pub waiting_for_header: bool,
+}
+
+#[derive(PartialEq)]
+pub enum GetReturn {
+    Ok,
+    QueueEmpty,
+}
+
+pub type RodioSink = Arc<Mutex<rodio::Sink>>;
+pub type ClientState = Arc<Mutex<ClientStateStruct>>;
+pub type PlayerState = Arc<Mutex<PlayerStateStruct>>;
 
 pub enum UiRequest {
     Prompt { s: String, prompt: String },
     Display(String),
-    GetMeta(Vec<Uuid>),
+    Shutdown,
+}
+
+#[derive(Tabled)]
+pub struct SongTable {
+    #[tabled(rename = "Sl.no")]
+    pub id: u16,
+    #[tabled(rename = "*")]
+    pub playing: PlayingDisplay,
+    #[tabled(rename = "Title")]
+    pub title: String,
+    #[tabled(rename = "Artists")]
+    pub artists: String,
+    #[tabled(rename = "Length")]
+    pub duration: String,
+}
+
+#[derive(Tabled)]
+pub struct PlaylistTable {
+    #[tabled(rename = "Sl.no")]
+    pub id: u16,
+    #[tabled(rename = "Title")]
+    pub name: String,
+    #[tabled(rename = "Entries")]
+    pub length: usize,
+}
+
+pub struct PlayingDisplay(pub bool);
+impl fmt::Display for PlayingDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", if self.0 { "▶" } else { " " })
+    }
 }
 
 pub struct UiResponse(pub String);

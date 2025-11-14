@@ -1,8 +1,17 @@
 use anyhow::Result;
 use musicman_protocol::*;
-use std::io::Read;
-use std::io::Write;
-use std::net::TcpStream;
+use std::{
+    io::{Read, Write},
+    net::TcpStream,
+};
+
+mod playlist_response;
+mod prompt;
+mod search_response;
+
+pub use playlist_response::*;
+pub use prompt::*;
+pub use search_response::*;
 
 pub fn send_to_server(mut stream: &TcpStream, req: Request) {
     //println!("Sending: {req:?}");

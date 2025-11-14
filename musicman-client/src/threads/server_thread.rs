@@ -1,34 +1,42 @@
 use crate::{helpers, types::*};
-use colored::Colorize;
 use musicman_protocol::*;
 use std::{
+    io,
     net::TcpStream,
     sync::mpsc::{Receiver, Sender},
     thread,
 };
+use tabled::settings::{Remove, Style, object::Columns};
 
 type Stream = TcpStream;
 
 pub fn server_interface(
     mut stream: Stream,
+    state: ClientState,
     ptx: Sender<Response>,
     utx: Sender<UiRequest>,
     srx: Receiver<UiResponse>,
 ) {
     thread::spawn(move || {
         loop {
-            if let Ok(response) = helpers::read_from_client(&mut stream) {
-                match response {
+            match helpers::read_from_client(&mut stream) {
+                Ok(response) => match response {
                     Response::Meta(songmeta) => {
                         let mins = songmeta.duration / 60;
                         let secs = songmeta.duration % 60;
-                        utx.send(UiRequest::Display(format!(
-                            "❯ {} by {} | {}m {}s",
-                            songmeta.title,
-                            songmeta.artists.join(", "),
-                            mins,
-                            secs
-                        )))
+                        let data = SongTable {
+                            id: 1,
+                            title: songmeta.title,
+                            artists: songmeta.artists.join(", "),
+                            duration: format!("{mins}m{secs}s"),
+                            playing: PlayingDisplay(false),
+                        };
+                        utx.send(UiRequest::Display(
+                            tabled::Table::new(vec![data])
+                                .with(Style::rounded())
+                                .with(Remove::column(Columns::one(1)))
+                                .to_string(),
+                        ))
                         .unwrap();
                     }
                     Response::SongChunk { .. }
@@ -36,31 +44,27 @@ pub fn server_interface(
                     | Response::EndOfStream { .. } => {
                         ptx.send(response).unwrap();
                     }
-                    Response::Playlist(plres) => match plres {
-                        PlaylistResponse::Playlists(playlists) => {}
-                        PlaylistResponse::Songs(songs) => {
-                            if songs.len() > 100 {
-                                utx.send(UiRequest::Prompt {
-                                    s: "Over 100 results found. Show all?".to_string(),
-                                    prompt: "choice".to_string(),
-                                })
+                    Response::Playlist(plres) => {
+                        helpers::handle_playlist_response(plres, &stream, &state, &utx, &srx)
+                    }
+                    Response::SearchResults(data) => {
+                        helpers::handle_search_response(data, &stream, &state, &utx, &srx)
+                    }
+                    Response::Error { message } => {
+                        utx.send(UiRequest::Display(message)).unwrap();
+                    }
+                },
+                Err(e) => {
+                    if let Some(ioerr) = e.downcast_ref::<io::Error>() {
+                        if ioerr.kind() == io::ErrorKind::UnexpectedEof {
+                            utx.send(UiRequest::Shutdown).unwrap();
+                            break;
+                        } else {
+                            utx.send(UiRequest::Display("Error: {e}".to_string()))
                                 .unwrap();
-                                if let Ok(res) = srx.recv() {
-                                    if !res.0.starts_with('y') {
-                                        continue;
-                                    }
-                                }
-                            }
-                            utx.send(UiRequest::GetMeta(songs)).unwrap();
                         }
-                    },
-
-                    _ => {
-                        println!("Received response: {:?}", response);
                     }
                 }
-            } else {
-                println!("{}", "Error: Failed to deserialize response".red());
             }
         }
     });
