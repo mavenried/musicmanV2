@@ -1,0 +1,7 @@
+
+[target.aarch64-linux-android]
+ar = "/home/mavenried/Downloads/android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-ar"
+linker = "/home/mavenried/Downloads/android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+rustflags = [
+  "-C", "link-args=-stdlib=libc++ -lc++_static -lm -ldl -llog -lOpenSLES"
+]

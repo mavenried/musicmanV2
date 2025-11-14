@@ -1,22 +1,36 @@
 use crate::{handlers::*, types::*};
 use anyhow::Result;
 use colored::Colorize;
-use std::{
-    io::{Write, stdin, stdout},
-    net::TcpStream,
-    sync::{Arc, Mutex},
-};
+use reedline::{Reedline, Signal};
+use std::net::TcpStream;
+use std::sync::{Arc, Mutex};
 
-pub fn handle_prompt(
+pub fn musicman_prompt(
     stream: &TcpStream,
     state: &Arc<Mutex<ClientStateStruct>>,
     sink: &RodioSink,
+    editor: &mut Reedline,
 ) -> Result<()> {
-    print!("{}", "musicman❯ ".green().bold());
-    stdout().flush().unwrap();
-    let mut input = String::new();
-    stdin().read_line(&mut input).unwrap();
-    input = input.trim().to_string();
+    let prompt = MusicmanPrompt {
+        left: "musicman❯ ".green().bold().to_string(),
+    };
+
+    let sig = editor.read_line(&prompt);
+
+    let input = match sig {
+        Ok(Signal::Success(buffer)) => buffer.trim().to_string(),
+        Ok(Signal::CtrlC) => {
+            println!("{}", "Use CtrlD or type exit to quit.".yellow().bold());
+            return Ok(());
+        }
+        Ok(Signal::CtrlD) => {
+            println!("{}", "Exiting...".green());
+            sink.lock().unwrap().stop();
+            return Err(anyhow::anyhow!("Exit"));
+        }
+        Err(e) => return Err(e.into()),
+    };
+
     let input = input
         .split_ascii_whitespace()
         .map(|s| s.to_string())
@@ -27,12 +41,12 @@ pub fn handle_prompt(
     }
 
     match input[0].as_str() {
-        "replay" => handle_replay(&stream, &state),
-        "pause" | "p" => handle_pause(&sink),
-        "clear" => handle_clear(&state, &sink),
+        "replay" => handle_replay(stream, state),
+        "pause" | "p" => handle_pause(sink),
+        "clear" => handle_clear(state, sink),
         "next" | "prev" => handle_next_prev(stream, state, input),
         "show" | "ls" => handle_show(state),
-        "playlist" | "pl" => handle_playlist(stream, input, &state),
+        "playlist" | "pl" => handle_playlist(stream, input, state),
         "search" => handle_search(stream, input),
         "exit" => {
             println!("{}", "Exiting...".green());
@@ -40,9 +54,10 @@ pub fn handle_prompt(
             return Err(anyhow::anyhow!("Exit"));
         }
         cmd => {
-            println!("{} {}", "Unknown command".red(), cmd.red().bold());
+            println!("{} {}", "Unknown command:".red(), cmd.red().bold());
             print_help();
         }
     }
+
     Ok(())
 }

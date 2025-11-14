@@ -6,6 +6,11 @@ use std::{
 use tabled::Tabled;
 use uuid::Uuid;
 
+mod linereader;
+pub use linereader::*;
+mod highlighter;
+pub use highlighter::*;
+
 pub struct ClientStateStruct {
     pub current_song: Option<SongMeta>,
     pub queue: Vec<SongMeta>,

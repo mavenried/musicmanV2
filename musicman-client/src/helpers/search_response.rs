@@ -17,9 +17,10 @@ pub fn handle_search_response(
         return;
     }
     if songs.len() > 100 {
-        utx.send(UiRequest::Display(
-            "More than 100 matches, please be more specific.".to_string(),
-        ))
+        utx.send(UiRequest::Display(format!(
+            "More than {} matches, please be more specific.",
+            songs.len()
+        )))
         .unwrap();
         return;
     }
