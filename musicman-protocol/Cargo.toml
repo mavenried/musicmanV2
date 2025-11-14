@@ -1,6 +1,6 @@
 [package]
 name = "musicman-protocol"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 authors = [
   "mavenried <github.com/mavenried>",
@@ -12,7 +12,6 @@ description = "Protocol for musicmanV2"
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"] }
 bincode = "2.0.1"
-tokio-util = {version="0.7.16", features = ["codec"] }
 uuid = { version = "1.4.1", features = ["v4", "serde"] }
 
 
