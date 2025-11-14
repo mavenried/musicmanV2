@@ -26,7 +26,10 @@ async fn main() -> anyhow::Result<()> {
         exit(1)
     };
 
-    let listener = TcpListener::bind(("0.0.0.0", port)).await?;
+    let Ok(listener) = TcpListener::bind(("0.0.0.0", port)).await else {
+        tracing::error!("Could not bind to port: {port}.");
+        exit(1)
+    };
     tracing::info!("Started index generation.");
 
     helpers::generate_index(&dirs::home_dir().unwrap().join("Music")).await?;
