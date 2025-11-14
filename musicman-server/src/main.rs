@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{env, process::exit, sync::Arc};
 
 use musicman_protocols::{PlaylistRequest, PlaylistResponse, Request, Response};
 use tokio::{
@@ -17,11 +17,20 @@ use types::State;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let listener = TcpListener::bind("0.0.0.0:4000").await?;
+    let Ok(port) = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "4000".to_string())
+        .parse::<u16>()
+    else {
+        tracing::error!("Could not parse port.");
+        exit(1)
+    };
+
+    let listener = TcpListener::bind(("0.0.0.0", port)).await?;
     tracing::info!("Started index generation.");
 
     helpers::generate_index(&dirs::home_dir().unwrap().join("Music")).await?;
-    tracing::info!("Server listening on 0.0.0.0:4000");
+    tracing::info!("Server listening on 0.0.0.0:{port}");
 
     loop {
         let (socket, addr) = listener.accept().await?;
