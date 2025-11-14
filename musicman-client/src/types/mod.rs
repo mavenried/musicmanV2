@@ -5,9 +5,9 @@ use std::{
 };
 use tabled::Tabled;
 use uuid::Uuid;
-
 mod linereader;
 pub use linereader::*;
+
 mod highlighter;
 pub use highlighter::*;
 
@@ -16,6 +16,7 @@ pub struct ClientStateStruct {
     pub queue: Vec<SongMeta>,
     pub current_idx: usize,
 }
+
 pub struct PlayerStateStruct {
     pub channels: u16,
     pub sample_rate: u32,
@@ -39,16 +40,22 @@ pub enum UiRequest {
     Shutdown,
 }
 
+pub struct UiResponse(pub String);
+
 #[derive(Tabled)]
 pub struct SongTable {
     #[tabled(rename = "Sl.no")]
     pub id: u16,
+
     #[tabled(rename = "*")]
     pub playing: PlayingDisplay,
+
     #[tabled(rename = "Title")]
     pub title: String,
+
     #[tabled(rename = "Artists")]
     pub artists: String,
+
     #[tabled(rename = "Length")]
     pub duration: String,
 }
@@ -57,17 +64,18 @@ pub struct SongTable {
 pub struct PlaylistTable {
     #[tabled(rename = "Sl.no")]
     pub id: u16,
+
     #[tabled(rename = "Title")]
     pub name: String,
+
     #[tabled(rename = "Entries")]
     pub length: usize,
 }
 
 pub struct PlayingDisplay(pub bool);
+
 impl fmt::Display for PlayingDisplay {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", if self.0 { "▶" } else { " " })
     }
 }
-
-pub struct UiResponse(pub String);

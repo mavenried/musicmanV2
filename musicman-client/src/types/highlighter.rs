@@ -47,7 +47,6 @@ impl Highlighter for MusicmanHighlighter {
                     Style::new().fg(Color::Red)
                 }
             } else if i == 1 {
-                // subcommand
                 let prev = line.split_whitespace().next().unwrap_or("");
 
                 let sub_known = self
@@ -68,18 +67,16 @@ impl Highlighter for MusicmanHighlighter {
                     .take(2)
                     .collect::<Vec<&str>>()
                     .join(" ");
-                let is_param = self.takes_parameters.contains(&cmd.trim());
 
+                let is_param = self.takes_parameters.contains(&cmd.trim());
                 if is_param {
                     Style::new().fg(Color::White).bold()
                 } else {
                     Style::new().fg(Color::DarkGray).italic()
                 }
             };
-
             out.push((style, chunk.to_string()));
         }
-
         out
     }
 }
