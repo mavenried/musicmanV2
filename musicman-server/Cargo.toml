@@ -21,7 +21,7 @@ tracing = "0.1.41"
 tracing-subscriber = "0.3.20"
 symphonia = { version = "0.5.4", features = ["mp3"] }
 anyhow = "1.0.99"
-musicman-protocol = "0.1.2"
+musicman-protocol = {path = "../musicman-protocol"}
 dirs = "6.0.0"
 serde_json = "1.0.144"
 uuid = {version= "1.18.1", features = ["v5", "serde"]}

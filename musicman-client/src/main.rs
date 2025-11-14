@@ -1,6 +1,7 @@
 use musicman_protocol::*;
 use rodio::{OutputStream, Sink};
 use std::net::TcpStream;
+use std::process::exit;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
@@ -24,7 +25,10 @@ fn main() {
     let (_stream, stream_handle) = OutputStream::try_default().unwrap();
 
     let sink = Arc::new(Mutex::new(Sink::try_new(&stream_handle).unwrap()));
-    let stream = TcpStream::connect(&addr).unwrap();
+    let Ok(stream) = TcpStream::connect(&addr) else {
+        println!("Connection Refused");
+        exit(1);
+    };
 
     let state = Arc::new(Mutex::new(ClientStateStruct {
         queue: Vec::new(),
