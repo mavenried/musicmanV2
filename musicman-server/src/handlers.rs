@@ -75,7 +75,7 @@ pub async fn stream_file(
 
         let samples = sample_buf.samples();
 
-        for chunk in samples.chunks(2000) {
+        for chunk in samples.chunks(8192) {
             let data: Vec<i16> = chunk.to_vec();
             let res = Response::SongChunk {
                 track_id: track_id.clone(),
