@@ -19,7 +19,7 @@ bincode = "1.3.3"
 colored = "3.0.0"
 rodio = "0.17"
 anyhow = "1"
-musicman-protocol = {path = "../musicman-protocol/", version = "0.1.3"}
+musicman-protocols = {path = "../musicman-protocol/", version = "0.1.3"}
 uuid = "1.18.1"
 tabled = "0.20.0"
 

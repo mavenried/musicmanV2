@@ -1,5 +1,5 @@
 use crate::{helpers::*, types::*};
-use musicman_protocol::*;
+use musicman_protocols::*;
 use symphonia::{
     core::{
         audio::SampleBuffer, codecs::DecoderOptions, formats::FormatOptions, meta::MetadataOptions,

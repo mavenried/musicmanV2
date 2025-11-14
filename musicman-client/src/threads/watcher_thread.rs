@@ -1,5 +1,5 @@
 use crate::{helpers::send_to_server, player, types::*};
-use musicman_protocol::*;
+use musicman_protocols::*;
 use std::{net::TcpStream, thread, thread::sleep, time::Duration};
 
 pub fn watcher_thread(

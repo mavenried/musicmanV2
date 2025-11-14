@@ -1,6 +1,6 @@
 use crate::{helpers, types::*};
 use colored::Colorize;
-use musicman_protocol::*;
+use musicman_protocols::*;
 use std::net::TcpStream;
 
 mod next_prev;

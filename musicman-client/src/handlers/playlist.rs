@@ -1,6 +1,6 @@
 use crate::{helpers, types::ClientState};
 use colored::Colorize;
-use musicman_protocol::{PlaylistRequest, Request};
+use musicman_protocols::{PlaylistRequest, Request};
 use std::net::TcpStream;
 
 pub fn handle_playlist(stream: &TcpStream, input: Vec<String>, state: &ClientState) {

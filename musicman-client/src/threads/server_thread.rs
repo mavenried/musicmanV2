@@ -1,5 +1,5 @@
 use crate::{helpers, types::*};
-use musicman_protocol::*;
+use musicman_protocols::*;
 use std::{
     io,
     net::TcpStream,

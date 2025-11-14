@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use musicman_protocol::{PlaylistRequest, PlaylistResponse, Request, Response};
+use musicman_protocols::{PlaylistRequest, PlaylistResponse, Request, Response};
 use tokio::{
     io::AsyncReadExt,
     net::{TcpListener, tcp::OwnedReadHalf},

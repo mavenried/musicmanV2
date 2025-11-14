@@ -1,6 +1,6 @@
 use crate::{helpers, player, types::*};
 use colored::Colorize;
-use musicman_protocol::Request;
+use musicman_protocols::Request;
 use std::net::TcpStream;
 
 pub fn handle_next_prev(stream: &TcpStream, state: &ClientState, input: Vec<String>) {

@@ -1,6 +1,6 @@
 use crate::types::*;
 use anyhow::Result;
-use musicman_protocol::*;
+use musicman_protocols::*;
 use std::{collections::HashMap, path::PathBuf};
 use symphonia::{
     core::{

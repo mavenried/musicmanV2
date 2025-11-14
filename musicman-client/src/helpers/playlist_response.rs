@@ -1,5 +1,5 @@
 use crate::{helpers, types::*};
-use musicman_protocol::*;
+use musicman_protocols::*;
 use std::{net::TcpStream, sync::mpsc};
 use tabled::settings::disable::Remove;
 use tabled::settings::{Style, object::Columns};

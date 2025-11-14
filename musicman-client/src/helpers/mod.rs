@@ -1,5 +1,5 @@
 use anyhow::Result;
-use musicman_protocol::*;
+use musicman_protocols::*;
 use std::{
     io::{Read, Write},
     net::TcpStream,

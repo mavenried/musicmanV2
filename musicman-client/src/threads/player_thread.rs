@@ -1,5 +1,5 @@
 use crate::types::*;
-use musicman_protocol::*;
+use musicman_protocols::*;
 use rodio::buffer::SamplesBuffer;
 use std::{sync::mpsc::Receiver, thread};
 

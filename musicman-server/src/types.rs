@@ -1,4 +1,4 @@
-use musicman_protocol::SongMeta;
+use musicman_protocols::SongMeta;
 use std::{collections::HashMap, sync::Arc};
 use tokio::{
     net::tcp::OwnedWriteHalf,

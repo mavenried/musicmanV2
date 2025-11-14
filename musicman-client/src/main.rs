@@ -1,4 +1,4 @@
-use musicman_protocol::*;
+use musicman_protocols::*;
 use rodio::{OutputStream, Sink};
 use std::net::TcpStream;
 use std::process::exit;

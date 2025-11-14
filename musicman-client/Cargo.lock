@@ -461,7 +461,7 @@ dependencies = [
  "anyhow",
  "bincode 1.3.3",
  "colored",
- "musicman-protocol",
+ "musicman-protocols",
  "rodio",
  "serde",
  "tabled",
@@ -469,7 +469,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "musicman-protocol"
+name = "musicman-protocols"
 version = "0.1.3"
 dependencies = [
  "bincode 2.0.1",
