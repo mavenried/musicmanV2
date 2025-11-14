@@ -1,4 +1,5 @@
 use crate::types::*;
+use anyhow::Result;
 use musicman_protocol::*;
 use std::{collections::HashMap, path::PathBuf};
 use symphonia::{
@@ -8,7 +9,7 @@ use symphonia::{
     default::get_probe,
 };
 use tokio::{
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::AsyncWriteExt,
 };
 use uuid::Uuid;
@@ -159,24 +160,6 @@ pub async fn get_track_file(track_id: &Uuid, index: &SongIndex) -> anyhow::Resul
     Err(anyhow::anyhow!("File Not Found!"))
 }
 
-pub async fn get_playlist(playlist_id: &Uuid, index: &SongIndex) -> anyhow::Result<Vec<SongMeta>> {
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
-        .join("musicman")
-        .join("playlists")
-        .join(format!("{}.json", playlist_id));
-
-    let data = tokio::fs::read_to_string(config_dir).await?;
-    let song_uuids: Vec<Uuid> = serde_json::from_str(&data)?;
-    let mut songs = vec![];
-    for id in song_uuids {
-        if let Some(meta) = get_track_meta(&id, index).await? {
-            songs.push(meta);
-        }
-    }
-    Ok(songs)
-}
-
 pub async fn get_track_meta(
     track_id: &Uuid,
     index: &SongIndex,
@@ -188,20 +171,64 @@ pub async fn get_track_meta(
     }
 }
 
-pub async fn get_all_playlists() -> anyhow::Result<Vec<Uuid>> {
-    let config_dir = dirs::config_dir()
+fn sanitize(name: String) -> String {
+    name.chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect()
+}
+
+pub async fn get_playlist(name: String) -> Result<PlaylistMeta> {
+    let playlists_dir = dirs::config_dir()
         .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
         .join("musicman")
         .join("playlists");
-    let mut playlists = vec![];
-    let mut dir = tokio::fs::read_dir(config_dir).await?;
+
+    let file_path = playlists_dir.join(format!("{}.json", sanitize(name)));
+    let data = fs::read_to_string(file_path).await?;
+    let playlist: PlaylistMeta = serde_json::from_str(&data)?;
+    Ok(playlist)
+}
+
+pub async fn get_all_playlists() -> Result<Vec<Playlist>> {
+    let playlists_dir = dirs::config_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
+        .join("musicman")
+        .join("playlists");
+
+    let mut dir = fs::read_dir(playlists_dir).await?;
+    let mut result = vec![];
+
     while let Some(entry) = dir.next_entry().await? {
         let path = entry.path();
-        if path.extension().and_then(|s| s.to_str()) == Some("json")
-            && let Some(name) = path.file_stem().and_then(|s| s.to_str())
-        {
-            playlists.push(Uuid::parse_str(name)?);
+        if path.extension().and_then(|s| s.to_str()) == Some("json") {
+            let data = fs::read_to_string(&path).await?;
+            let playlist: PlaylistMeta = serde_json::from_str(&data)?;
+            result.push(Playlist {
+                name: playlist.title,
+                len: playlist.songs.len(),
+            });
         }
     }
-    Ok(playlists)
+
+    Ok(result)
+}
+
+pub async fn create_playlist(title: String, songs: Vec<SongMeta>) -> Result<()> {
+    let playlists_dir = dirs::config_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
+        .join("musicman")
+        .join("playlists");
+
+    fs::create_dir_all(&playlists_dir).await?;
+
+    let playlist = PlaylistMeta {
+        title: sanitize(title),
+        songs,
+    };
+
+    let file_path = playlists_dir.join(format!("{}.json", playlist.title));
+    let data = serde_json::to_string_pretty(&playlist)?;
+    fs::write(file_path, data).await?;
+
+    Ok(())
 }

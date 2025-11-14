@@ -67,7 +67,6 @@ async fn handle_client(socket: tokio::net::TcpStream) -> anyhow::Result<()> {
         match request {
             Request::Play { track_id } => {
                 if let Some(_) = &state.current_stream_cancel {
-                    info!("Cancelling Stream");
                     state.current_stream_cancel = None;
                 }
                 match helpers::get_track_file(&track_id, &index).await {
@@ -100,7 +99,7 @@ async fn handle_client(socket: tokio::net::TcpStream) -> anyhow::Result<()> {
             }
             Request::Search(s_type) => {
                 let data = handlers::handle_search(s_type, &index).await;
-                let res = Response::Playlist(PlaylistResponse::Songs(data));
+                let res = Response::SearchResults(data);
                 helpers::send_to_client(&write, &res).await?;
             }
             Request::Playlist(plreq) => match plreq {
@@ -110,11 +109,14 @@ async fn handle_client(socket: tokio::net::TcpStream) -> anyhow::Result<()> {
                     let res = Response::Playlist(plres);
                     helpers::send_to_client(&write, &res).await?;
                 }
-                PlaylistRequest::Get { playlist_id } => {
-                    let songs = helpers::get_playlist(&playlist_id, &index).await?;
-                    let plres = PlaylistResponse::Songs(songs);
+                PlaylistRequest::Get { name } => {
+                    let pl = helpers::get_playlist(name).await?;
+                    let plres = PlaylistResponse::Songs(pl.songs);
                     let res = Response::Playlist(plres);
                     helpers::send_to_client(&write, &res).await?;
+                }
+                PlaylistRequest::Create { name, songs } => {
+                    helpers::create_playlist(name, songs).await?;
                 }
             },
             Request::Meta { track_id } => {
