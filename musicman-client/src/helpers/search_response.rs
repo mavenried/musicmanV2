@@ -16,6 +16,13 @@ pub fn handle_search_response(
             .unwrap();
         return;
     }
+    if songs.len() > 100 {
+        utx.send(UiRequest::Display(
+            "More than 100 matches, please be more specific.".to_string(),
+        ))
+        .unwrap();
+        return;
+    }
 
     let table_vec: Vec<SongTable> = songs
         .iter()
@@ -95,4 +102,3 @@ pub fn handle_search_response(
         .unwrap();
     }
 }
-
